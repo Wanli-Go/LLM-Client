@@ -467,7 +467,7 @@ function App() {
         {!newConversationFlag && (
           /** whole response area */
           <div className="response-area w-[75%] space-y-4 flex flex-col items-start">
-            {(rawThinkingContent.length > 0 || loadingState === 'THINKING' || isUsingThinkingModel && loadingState === 'GENERATING') && (
+            {(rawThinkingContent.length > 0) && (
               // thinking area
               <div className="thinking-wrapper fade-in w-full relative">
                 {/** black background - covers button at first, and the thinking content if expanded */}
