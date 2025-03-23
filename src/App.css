@@ -1,0 +1,166 @@
+@import "tailwindcss";
+@import 'primeicons/primeicons.css';
+
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+  opacity: 1;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-out {
+  animation: fadeOut 0.3s ease-in-out;
+  opacity: 0;
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.insane-animation{
+  background-size: 600% 600%;
+  animation: 3s gradient 500ms ease infinite;
+  animation-delay: -300ms;
+  background-clip: text;
+}
+@keyframes gradient {
+  0% {
+    background-position: 70% 50%;
+  }
+  100% {
+    background-position: 30% 50%;
+  }
+}
+
+.padding-space {
+  height: 23.5vh;
+  transition: height 0.73s ease;
+}
+
+.padding-space.shrunken{
+  height: 0vh;
+}
+
+.padding-space.reduce-motion {
+  transition: none !important;
+}
+
+.input-field {
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.input-field:focus {
+  transform: scale(1.023);
+  box-shadow: 0 0 0 3px #101828, 0 0 0 5.5px #56eeff, 0 1px 2px 0 rgb(0, 0, 0)
+}
+
+.input-field.reduce-motion{
+  transform: none !important;
+  transition: none !important;
+}
+
+.thinking-background.opening {
+  transition-property: height, width;
+  transition-duration: 400ms, 250ms;
+  transition-delay: 135ms, 0ms
+}
+.thinking-background.opening.completed {
+  transition-delay: 0ms, 0ms;
+}
+
+.thinking-background.closing {
+  transition-property: height, width;
+  transition-duration: 350ms, 350ms;
+  transition-delay: 0ms, 0ms
+}
+
+.thinking-background.reduce-motion {
+  transition-property: none !important;
+}
+
+pre[class*="language-"] {
+  background: #111828 !important;
+  padding: 1.5em;
+  margin: 1em 0;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  height: fit-content;
+  transition: height 0.3s ease;
+}
+
+code[class*="language-"] {
+  font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+.mask-animation-bottom {
+  clip-path: polygon(0 0, 100% 0, 100% 0, 0 0);
+  animation: mask-animation-bottom-frames 0.4s forwards 150ms;
+}
+
+@keyframes mask-animation-bottom-frames {
+  0% {
+    clip-path: polygon(0 0, 100% 0, 100% 0, 0 0);
+  }
+  100% {
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  }
+}
