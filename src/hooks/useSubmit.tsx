@@ -143,6 +143,7 @@ const useChatSubmitAndStyle = ({input, setLoadingState, setEmptyContent, isUsing
       let nextBacktickedText = false;
       let newlineFlag = false;
       let trimNextWord = false;
+      let wordCount = 0;
 
       try {
         const response: ReadableStreamDefaultReader = await fetchChatResponse(input, isUsingThinkingModelBuffered, abortController.current.signal);
@@ -186,7 +187,7 @@ const useChatSubmitAndStyle = ({input, setLoadingState, setEmptyContent, isUsing
 
               // style the output              
               let styledContent: OutputType;
-              [styledContent, { nextTitleFlag, nextBoldText, nextBacktickedText, newlineFlag, trimNextWord }] = styleFilter(rawContent, 0, {nextTitleFlag, nextBoldText, nextBacktickedText, newlineFlag, trimNextWord});
+              [styledContent, { nextTitleFlag, nextBoldText, nextBacktickedText, newlineFlag, trimNextWord }] = styleFilter(rawContent, wordCount++, {nextTitleFlag, nextBoldText, nextBacktickedText, newlineFlag, trimNextWord});
 
               if (localThinking) {
                 setThinkingContent((prev) => [...prev, styledContent]);
