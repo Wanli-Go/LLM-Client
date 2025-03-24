@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import classNames from "classnames";
 
 type CodeBlocksType = Record<
@@ -35,7 +35,7 @@ export const useCodeBlock = (reduceMotion: boolean) => {
     lastBackTick: false
   });
 
-  const resetBlock = (lastBacktick?: boolean) => {
+  const resetBlock = useCallback((lastBacktick?: boolean) => {
     currentBlockInfo.current.isActive = false;
     currentBlockInfo.current.language = "";
     currentBlockInfo.current.lines = "";
@@ -44,9 +44,9 @@ export const useCodeBlock = (reduceMotion: boolean) => {
     currentBlockInfo.current.expectEmptyLine = false;
     currentBlockInfo.current.lastBackTick = false;
     if(lastBacktick) currentBlockInfo.current.lastBackTick = true;
-  }
+  },[]);
 
-  const flushCode = () => {
+  const flushCode = useCallback(() => {
     currentBlockInfo.current.lines += currentBlockInfo.current.buffer;
     setCodeBlocks((prev) => ({
       ...prev,
@@ -58,9 +58,9 @@ export const useCodeBlock = (reduceMotion: boolean) => {
     }));
     currentBlockInfo.current.buffer = "";
     currentBlockInfo.current.textBuffer = [];
-  };
+  },[]);
 
-  const processCodeToken = (word: string) => {
+  const processCodeToken = useCallback((word: string) => {
     if (currentBlockInfo.current.expectEmptyLine) {
       currentBlockInfo.current.expectEmptyLine = false;
       return;
@@ -94,7 +94,7 @@ export const useCodeBlock = (reduceMotion: boolean) => {
         text: currentBlockInfo.current.textBuffer,
       },
     }));
-  };
+  },[flushCode, reduceMotion]);
 
   return { codeBlocks, setCodeBlocks, currentBlockInfo, processCode: processCodeToken, resetBlock };
 };

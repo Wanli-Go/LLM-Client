@@ -1,15 +1,18 @@
 import "./App.css";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BreadcrumbIcon from "./assets/svg/breadcrumb";
 import classNames from "classnames";
 import Setting from "./components/Setting";
-import * as _ from "radashi";
 import useSettings from "./hooks/useSettings";
 import CodeBlock from "./components/ChatView/CodeBlock";
 import { useCodeBlock } from "./hooks/useCodeBlocks";
-import SubmitButton from "./components/ChatView/SubmitButton";
-import {chatHistory, fetchChatResponse} from "./requests/fetchChatResponse";
-import { animation } from "./utils/scrolldown-animation.js";
+import SubmitButtons from "./components/ChatView/SubmitButtons";
+import {chatHistory} from "./requests/fetchChatResponse";
+import useChatSubmitAndStyle from "./hooks/useSubmit.js";
+import useAutoScroll from "./hooks/useAutoScroll.js";
+import useThinkingStyles from "./hooks/useThinkingAnimation.js";
+import useSetEmpty from "./hooks/useSetEmpty.js";
+import OutputType from "./types/outputType.js";
 
 function App() {
 
@@ -20,6 +23,7 @@ function App() {
   const [loadingState, setLoadingState] = useState<
     "SENT" | "THINKING" | "GENERATING" | "WAITING"
   >("WAITING");
+  const [error, setError] = useState("");
 
   // settings hooks
   const {
@@ -34,109 +38,16 @@ function App() {
     isUsingThinkingModelBuffered
   } = useSettings(loadingState);
 
-  const [error, setError] = useState("");
-  type OutputType = 
-    { type: "text"; content: React.ReactNode } // styled text
-    | { type: "code"; id: string } // code block placeholder, will render as CodeBlock
-    | string // raw text (optional)
-    | null; // for safety
-  
-  // response output
+  // response output (render raw~Content when using raw mode)
   const [thinkingContent, setThinkingContent] = useState<OutputType[]>([]);
   const [rawThinkingContent, setRawThinkingContent] = useState<OutputType[]>([]);
   const [mainResponse, setMainResponse] = useState<OutputType[]>([]);
   const [rawMainResponse, setRawMainResponse] = useState<OutputType[]>([]);
 
-  const setEmptyContent = useCallback(({think, response} : {think?: boolean, response?: boolean}) => {
-    if (think) {
-      setThinkingContent([]);
-      setRawThinkingContent([]);
-    }
-    if (response) {
-      setMainResponse([]);
-      setRawMainResponse([]);
-    }
-  }, []);
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  const setDefaultThinkingContentRef = useRef<Function>(undefined);
-  useEffect(() => {
-    setDefaultThinkingContentRef.current = () => {
-      setThinkingContent([language === 'zh' ? '[无思考内容]' : '[No Thinking Content]']);
-      setRawThinkingContent([language === 'zh' ? '[无思考内容]' : '[No Thinking Content]']);
-    };
-  }, [language]);
+  const {setEmptyContent, setDefaultThinkingContentRef} = useSetEmpty({language, setThinkingContent, setRawThinkingContent, setMainResponse, setRawMainResponse});
 
-  /**
-   * auto-scroll
-  */ 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const isGluedToButtom = useRef(true);
-  useEffect(()=>{ // auto-scroll
-    const scrollDom = scrollRef.current;
-    if(scrollDom) {
-      const target = scrollDom.scrollHeight - scrollDom.clientHeight;
-      if( isGluedToButtom.current )animation(scrollDom, target);
-      if( target - scrollDom.scrollTop < 10) {
-        isGluedToButtom.current = true;
-      }
-      if ( target - scrollDom.scrollTop > 36) {
-        isGluedToButtom.current = false;
-      }
-    }
-  },[rawMainResponse.length, rawThinkingContent.length]);
-  useEffect(()=>{
-    document.addEventListener('scrolledUp', ()=>{
-      isGluedToButtom.current = false;
-    })
-  }, []);
-  
-  // for focusing
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const tabIndexAnchorRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * When loadingState changes
-   */
-  const isUsingThinkingModelBufferedRef = useRef(isUsingThinkingModelBuffered);
-  isUsingThinkingModelBufferedRef.current = isUsingThinkingModelBuffered;
-  useEffect(()=>{ // when loading state changes
-    if (loadingState === 'WAITING') {
-      if(newConversationFlag)inputRef.current?.focus();
-      else {
-        tabIndexAnchorRef.current?.focus();
-        if(!error){
-          chatHistory.push({role: 'user', content: input});
-          chatHistory.push({role: 'assistant', content: ([...rawMainResponse] as string[]).join('')});          
-        }
-      }
-    }
-    if (loadingState === 'SENT') {
-      setError("");
-      if(newConversationFlag) setEmptyContent({think: true, response: true});
-    }
-    else if(loadingState === 'THINKING') {
-      setEmptyContent({think: true, response: true});
-      setNewConversationFlag(false);
-      setTimeout(()=>setShowThinking(true), 500);
-    }
-    else if (loadingState === 'GENERATING' && isUsingThinkingModelBufferedRef.current) { // when not using thinking model, bypass useEffect
-      setEmptyContent({response: true});
-      setThinkingContent((prev) => {
-        if (prev.length < 10) {
-          requestAnimationFrame(()=>setDefaultThinkingContentRef.current?.());
-        }
-        return prev;
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadingState, inputRef, isUsingThinkingModelBufferedRef, newConversationFlag, setEmptyContent]);
-
-  // code block hooks
-  const { codeBlocks, setCodeBlocks, currentBlockInfo, processCode, resetBlock } = useCodeBlock(reduceMotion);
-
-  /**
-   * render OutputType[] to HTML or text or code blocks
-   */
+  const { codeBlocks } = useCodeBlock(reduceMotion);
+  // render OutputType[] to HTML or text or code blocks
   const renderOutput = (content: OutputType[]) => {
     return content.map((part) => {
       if (!part) return;
@@ -158,238 +69,59 @@ function App() {
     })
   }
 
+  // for focusing when entering the app, and when pressing tab after generation
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const tabIndexAnchorRef = useRef<HTMLDivElement>(null);
+
+  // show thinking button animation
+  const { thinkingBackgroundRef, thinkingContentRef } = useThinkingStyles({ showThinking, reduceMotion, language,
+    thinkingContent, isUsingThinkingModelBuffered, isRawMode});
+
+  // handle submit event
+  const { handleSubmit, abort } = useChatSubmitAndStyle({input, setLoadingState, setEmptyContent, isUsingThinkingModelBuffered, 
+    reduceMotion, setNewConversationFlag, setThinkingContent, setRawThinkingContent,
+    setMainResponse, setRawMainResponse, setError});
+
+  // auto-scroll
+  const {scrollRef} = useAutoScroll({rawMainResponse, rawThinkingContent});
+
+  // util ref for not triggering the useEffect below
+  const isUsingThinkingModelBufferedRef = useRef(isUsingThinkingModelBuffered); 
+  isUsingThinkingModelBufferedRef.current = isUsingThinkingModelBuffered;
 
   /**
-   * UI Refs for styling components inside `thinking-wrapper`. This is a bit hacky, but it works.
-   * Mainly responsible for the resizing of thinking-background to cover all thinking texts.
+   * When loadingState changes
    */
-  const [resizeFlag, setResizeFlag] = useState(false);
-  const handleResize = _.throttle({ interval: 200 }, () => {
-    setResizeFlag(true);
-    setTimeout(() => setResizeFlag(false), 150);
-  });
   useEffect(()=>{
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  },[handleResize]);
-  const thinkingBackgroundRef = useRef<HTMLDivElement>(null);
-  const thinkingContentRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const contentHeight = thinkingContentRef.current?.scrollHeight ?? 0;
-    const contentWidth = thinkingContentRef.current?.scrollWidth ?? 0;
-    if (showThinking) {
-      // Style changes after you show thinking content: expanding background to wrap content
-      if (thinkingBackgroundRef.current && thinkingContentRef.current) {
-        if (resizeFlag || reduceMotion ) {
-          thinkingBackgroundRef.current.classList.add("reduce-motion");
-        } else {
-          thinkingBackgroundRef.current.classList.remove("reduce-motion");
+    if (loadingState === 'WAITING') { // after generating: focus on inital tab anchor and push chat history
+      if(newConversationFlag)inputRef.current?.focus();
+      else {
+        tabIndexAnchorRef.current?.focus();
+        if(!error){
+          chatHistory.push({role: 'user', content: input});
+          chatHistory.push({role: 'assistant', content: ([...rawMainResponse] as string[]).join('')});          
         }
-        thinkingBackgroundRef.current.style.height = `${contentHeight + 40}px`;
-        thinkingBackgroundRef.current.style.width = `${contentWidth}px`;
-        thinkingContentRef.current.style.opacity = "1";
-        thinkingContentRef.current.style.zIndex = "10";
-        if(!reduceMotion) thinkingContentRef.current.classList.add("mask-animation-bottom"); // dropdown effect
-        if(!thinkingBackgroundRef.current.classList.contains('completed')) requestAnimationFrame(()=>thinkingBackgroundRef.current?.classList.add('completed'))
       }
-    } else if (!showThinking && thinkingBackgroundRef.current && thinkingContentRef.current) {
-      if (reduceMotion) {
-        thinkingBackgroundRef.current.classList.add("reduce-motion");
-      } else {
-        thinkingBackgroundRef.current.classList.remove("reduce-motion");
-      }
-      thinkingBackgroundRef.current.style.height = `48px`;
-      thinkingBackgroundRef.current.style.width =
-        language === "en" ? `184px` : `136px`;
-      thinkingContentRef.current.style.opacity = "0";
-      thinkingContentRef.current.style.zIndex = "-10";
-      if(!reduceMotion) thinkingContentRef.current.classList.remove("mask-animation-bottom");
-      if(thinkingBackgroundRef.current.classList.contains('completed')) thinkingBackgroundRef.current?.classList.remove('completed');
     }
-  }, [language, showThinking, thinkingContent, resizeFlag, reduceMotion, isUsingThinkingModelBuffered, isRawMode]);
-
-  const abortController = useRef(new AbortController());
-  const abort = () => {
-    abortController.current.abort();
-    setLoadingState('WAITING');
-  };
-
-  /**
-   * Trigger submit process, then receive streaming response while styling them
-   */
-  const handleSubmit = useCallback(async (e?: React.FormEvent<HTMLFormElement>, regen?: boolean) => {
-    e?.preventDefault();
-    if (!input.trim()) return;
-    if(regen) chatHistory.splice(-2, 2);
-
-    abortController.current = new AbortController();
-    setLoadingState("SENT");
-
-    // Local variables for stream processing
-    let localThinking = false; //避免函数闭包访问不到state的问题
-    let firstResponseToken = true; //第一个响应token必定是回车，去除
-    let nextTitleFlag = 0; // 0: normal, 1: title, 2: subtitle, 3: subsubtitle.
-    let nextBoldText = false;
-    let nextBacktickedText = false;
-    let newlineFlag = false;
-    let trimNextWord = false;
-
-    /** 
-     * Each word goes through this filter to determine its style 
-     */
-    const styleFilter = (
-      word: string,
-      key: number
-    ): OutputType => {
-      if (trimNextWord) {
-        trimNextWord = false;
-        word = word.trim();
-      }
-      // Start a code block
-      if (word.includes('```')) {
-        if(currentBlockInfo.current.isActive) {
-          resetBlock();
-          return null;
-        }
-        currentBlockInfo.current.isActive = true;
-        const newBlockId = Math.random().toString(36).substring(7);
-        currentBlockInfo.current.currentBlockId = newBlockId;
-        setCodeBlocks((prev) => ({
-          ...prev,
-          [newBlockId]: {
-            lines: "",
-            language: "",
-            text: [],
-          },
-        }));
-        return { type: "code", id: newBlockId };
-      }
-      // End a code block alternatively
-      if (word.includes('``') && currentBlockInfo.current.isActive) {
-          resetBlock(true);
-          return null;
-      }
-      if (currentBlockInfo.current.lastBackTick && word.includes('`')) {
-        currentBlockInfo.current.lastBackTick = false;
-        return '\n';
-      }
-      // Process code block content
-      if (currentBlockInfo.current.isActive) {
-        processCode(word);
-        return null;
-      }
-
-      const localTitleFlag = nextTitleFlag;
-      let localBoldText = nextBoldText;
-      let localBacktickedText = nextBacktickedText;
-      if (word.includes('`')) {
-        nextBacktickedText = !localBacktickedText;
-        if(!nextBacktickedText && word.startsWith('`')) localBacktickedText = false;
-        word = word.replace("`", "");
-      }
-      if (!localBacktickedText) {
-        if (word.includes("-") && newlineFlag) {
-          return {type: 'text', content: <span className="pi pi-angle-right" style={{ fontSize: '12px', lineHeight: '24px' }}></span>}
-        }
-        if (word.startsWith("#")) {
-          nextTitleFlag = Math.min(Math.max(word.split("").length, 1), 3);
-          trimNextWord = true;
-          return null;
-        }
-        if (word.includes("**")) {
-          nextBoldText = !localBoldText;
-          if(!nextBoldText && word.startsWith('**')) localBoldText = false;
-          word = word.replace("**", "");
-        }
-      }
-      newlineFlag = false;
-      if (word.includes("\n")) {
-        nextTitleFlag = 0;
-        nextBoldText = false;
-        newlineFlag = true;
-      }
-
-      return {
-        type: "text",
-        content: (
-          <span
-            className={classNames({
-              "fade-in": !reduceMotion,
-              "text-xl": localTitleFlag === 3,
-              "text-2xl": localTitleFlag === 2,
-              "text-3xl": localTitleFlag === 1,
-              "font-bold": localTitleFlag > 0 || localBoldText,
-              "font-mono": localBacktickedText,
-              "text-amber-100": localBacktickedText
-            })}
-            key={key}
-          >
-            {word}
-          </span>
-        ),
-      };
-    };
-
-    /**
-     * API Call
-     */
-    try {
-      const response: ReadableStreamDefaultReader = await fetchChatResponse(input, isUsingThinkingModelBuffered, abortController.current.signal);// Directly read the response body as a stream
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await response.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n").filter((l) => l.trim());
-
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line);
-            const content: string = data.message.content
-              .replace(/\\u003c/g, "<")
-              .replace(/\\u003e/g, ">");
-            
-            // Handle thinking tags
-            if (content === "<think>") {
-              setLoadingState("THINKING");
-              localThinking = true;
-              continue;
-            }
-            if (content === "</think>") {
-              setLoadingState("GENERATING");
-              localThinking = false;
-              firstResponseToken = true;
-              continue;
-            }
-            // 根据当前状态分发内容
-            if (firstResponseToken) {
-              if(!isUsingThinkingModelBuffered) {
-                setLoadingState('GENERATING');
-                setEmptyContent({think: true, response: true});
-                setNewConversationFlag(false);
-              }
-              firstResponseToken = false; 
-              if(isUsingThinkingModelBuffered) continue;
-            }
-            if (localThinking) {
-              setThinkingContent((prev) => [...prev, styleFilter(content, prev.length)]);
-              setRawThinkingContent((prev) => [...prev, content]);
-            } else {
-              setMainResponse((prev) => [...prev, styleFilter(content, prev.length)]);
-              setRawMainResponse((prev) => [...prev, content]);
-            }
-          } catch (err) {
-            console.error("Error parsing chunk:", err);
-          }
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "请求失败");
-    } finally {
-      setLoadingState("WAITING");
+    else if (loadingState === 'SENT') setError("");
+    else if(loadingState === 'THINKING') { // state changes to thinking: clear all previous response content, and show thinking (delayed for smoothness)
+      setEmptyContent({think: true, response: true});
+      setNewConversationFlag(false);
+      setTimeout(()=>setShowThinking(true), 300);
     }
-  }, [input, currentBlockInfo, reduceMotion, setCodeBlocks, resetBlock, processCode, isUsingThinkingModelBuffered, setEmptyContent]);
+    else if 
+      (loadingState === 'GENERATING' // state changes to generating: if too few thinking tokens, set default thinking content
+      && isUsingThinkingModelBufferedRef.current) {  // when not using thinking model, bypass this effect (see useSubmit.tsx line 179)
+      setEmptyContent({response: true});
+      setThinkingContent((prev) => {
+        if (prev.length < 10) {
+          requestAnimationFrame(()=>setDefaultThinkingContentRef.current?.());
+        }
+        return prev;
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingState, newConversationFlag, setEmptyContent, setDefaultThinkingContentRef]); // omit states in dependency
 
   return (
     <div ref={scrollRef} className="h-screen w-screen overflow-auto bg-gradient-to-b from-gray-900 to-gray-800 text-gray-100 p-4 md:p-8" style={{scrollbarGutter: 'stable'}}>
@@ -422,40 +154,26 @@ function App() {
           })}`}
         ></div>
 
-        {/** Input area and submit button */}
-        <form onSubmit={handleSubmit} className="w-full">
-          <div className="space-y-6 flex flex-col relative items-center">
-            {/** Textarea */}
-            <textarea
-              ref={inputRef}
-              tabIndex={0}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={
-                language === "zh"
-                  ? "请输入您的问题..."
-                  : "Enter your question..."
-              }
-              className={`input-field w-200 p-4 rounded-lg bg-gray-800 border border-gray-700 outline-none resize-none ${classNames({'reduce-motion': reduceMotion})}`}
-              rows={4}
-              disabled={loadingState !== "WAITING"}
-            />
+        {/** Input area and submit buttons */}
+        <div className="space-y-6 flex flex-col relative items-center w-full">
+          {/** Textarea */}
+          <textarea
+            ref={inputRef}
+            tabIndex={0}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={
+              language === "zh"
+                ? "请输入您的问题..."
+                : "Enter your question..."
+            }
+            className={`input-field w-200 p-4 rounded-lg bg-gray-800 border border-gray-700 outline-none resize-none ${classNames({'reduce-motion': reduceMotion})}`}
+            rows={4}
+            disabled={loadingState !== "WAITING"}
+          />
 
-            {/** Submit Button */}
-            <div className="relative h-16">
-              <SubmitButton loadingState={loadingState} language={language} reduceMotion={reduceMotion}></SubmitButton>
-              {!newConversationFlag && (
-                <button className={`w-11 h-11 fade-in relative -right-76 -top-11 transition-opacity duration-300 ${loadingState !== "WAITING" ? 'opacity-0' : 'opacity-100'}`} onClick={(e)=>{
-                  e.preventDefault();
-                  if(loadingState == 'WAITING') handleSubmit(undefined, true);
-                  else abort();
-                }}>
-                  <i className={`pi ${loadingState !== "WAITING" ? 'pi-stop-circle' : 'pi-undo'} absolute top-[0.8rem] left-[0.81rem]`} style={{fontSize: '22.5 px'}}></i>
-                </button>
-              )}
-            </div>
-          </div>
-        </form>
+          <SubmitButtons loadingState={loadingState} language={language} reduceMotion={reduceMotion} onSubmit={() => handleSubmit({})} newConversationFlag={newConversationFlag} abort={abort}></SubmitButtons>
+        </div>
 
         {/** Error Area */}
         {error && (
