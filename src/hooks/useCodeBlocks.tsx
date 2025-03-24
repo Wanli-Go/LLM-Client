@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import classNames from "classnames";
 
-type CodeBlocksType = Record<
+export type CodeBlocksType = Record<
   string,
   {
     lines: string;
@@ -10,7 +10,7 @@ type CodeBlocksType = Record<
   }
 >;
 
-export interface CurrentCodeBlockInfo {
+export type CurrentCodeBlockInfo = {
   currentBlockId: string;
   isActive: boolean;
   language: string;

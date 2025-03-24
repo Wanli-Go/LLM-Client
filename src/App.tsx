@@ -46,7 +46,7 @@ function App() {
 
   const {setEmptyContent, setDefaultThinkingContentRef} = useSetEmpty({language, setThinkingContent, setRawThinkingContent, setMainResponse, setRawMainResponse});
 
-  const { codeBlocks } = useCodeBlock(reduceMotion);
+  const { codeBlocks, setCodeBlocks, processCode, currentBlockInfo, resetBlock } = useCodeBlock(reduceMotion);
   // render OutputType[] to HTML or text or code blocks
   const renderOutput = (content: OutputType[]) => {
     return content.map((part) => {
@@ -58,6 +58,10 @@ function App() {
         return part.content;
       }
       const block = codeBlocks[part.id];
+      if (!block) {
+        console.error(`Code block with id ${part.id} not found`);
+        return null;
+      }
       return (
         <CodeBlock
           key={part.id}
@@ -80,7 +84,7 @@ function App() {
   // handle submit event
   const { handleSubmit, abort } = useChatSubmitAndStyle({input, setLoadingState, setEmptyContent, isUsingThinkingModelBuffered, 
     reduceMotion, setNewConversationFlag, setThinkingContent, setRawThinkingContent,
-    setMainResponse, setRawMainResponse, setError});
+    setMainResponse, setRawMainResponse, setError, setCodeBlocks, processCode, currentBlockInfo, resetBlock});
 
   // auto-scroll
   const {scrollRef} = useAutoScroll({rawMainResponse, rawThinkingContent});

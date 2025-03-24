@@ -2,7 +2,7 @@
 import classNames from "classnames";
 import { useRef, useCallback } from "react";
 import { chatHistory, fetchChatResponse } from "../requests/fetchChatResponse";
-import { useCodeBlock } from "./useCodeBlocks";
+import { CodeBlocksType, CurrentCodeBlockInfo } from "./useCodeBlocks";
 import OutputType from "../types/outputType";
 
 /**
@@ -10,7 +10,7 @@ import OutputType from "../types/outputType";
  */
 const useChatSubmitAndStyle = ({input, setLoadingState, setEmptyContent, isUsingThinkingModelBuffered, 
     reduceMotion, setNewConversationFlag, setThinkingContent, setRawThinkingContent,
-    setMainResponse, setRawMainResponse, setError}:{
+    setMainResponse, setRawMainResponse, setError, setCodeBlocks, currentBlockInfo, processCode, resetBlock}:{
         input: string,
         setLoadingState: React.Dispatch<React.SetStateAction<"SENT" | "THINKING" | "GENERATING" | "WAITING">>,
         setEmptyContent: ({ think, response }: { think?: boolean; response?: boolean }) => void,
@@ -21,11 +21,14 @@ const useChatSubmitAndStyle = ({input, setLoadingState, setEmptyContent, isUsing
         setRawThinkingContent: React.Dispatch<React.SetStateAction<OutputType[]>>,
         setMainResponse: React.Dispatch<React.SetStateAction<OutputType[]>>,
         setRawMainResponse: React.Dispatch<React.SetStateAction<OutputType[]>>,
-        setError: React.Dispatch<React.SetStateAction<string>>
+        setError: React.Dispatch<React.SetStateAction<string>>,
+        setCodeBlocks: React.Dispatch<React.SetStateAction<CodeBlocksType>>,
+        currentBlockInfo: React.RefObject<CurrentCodeBlockInfo>,
+        processCode: (code: string) => void,
+        resetBlock: (lastBacktick?: boolean) => void
     }
   ) => {
     const abortController = useRef(new AbortController());
-    const { setCodeBlocks, currentBlockInfo, processCode, resetBlock } = useCodeBlock(reduceMotion);
 
     const styleFilter = useCallback((
       content: string, 
@@ -54,6 +57,7 @@ const useChatSubmitAndStyle = ({input, setLoadingState, setEmptyContent, isUsing
         }
         currentBlockInfo.current.isActive = true;
         const newBlockId = Math.random().toString(36).substring(7);
+        console.log(`New code block ${newBlockId} created.`);
         currentBlockInfo.current.currentBlockId = newBlockId;
         setCodeBlocks((prev) => ({
           ...prev,
